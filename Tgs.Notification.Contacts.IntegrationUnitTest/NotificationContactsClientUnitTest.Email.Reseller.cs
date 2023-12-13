@@ -1,0 +1,143 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using Tgs.Notification.Contacts.Client;
+
+using Tgs.Notification.Contacts.Common.Models;
+using Tgs.Notification.Contacts.Core.ApplicationServices;
+using Tgs.ServiceUtility;
+
+namespace Tgs.Notification.Contacts.IntegrationUnitTest;
+
+public partial class NotificationContactsClientUnitTest
+{
+    [Fact]
+    public async Task Email_Reseller_Get()
+    {
+        var code = "TGS";
+
+        var web = new TestNotificationContactsApplication(builder =>
+        {
+            _ = builder.ConfigureServices(services =>
+            {
+                var fakeService = Substitute.For<IGetService<EmailResellerGetQuery, EmailGetResult?>>();
+
+                var query = new EmailResellerGetQuery(code);
+
+                _ = fakeService.GetAsync(
+                    query: Arg.Is(query),
+                    cancellationToken: Arg.Any<CancellationToken>())
+                .Returns(new EmailGetResult(
+                        ResellerId: Guid.Parse("b5a2c708-ab70-4316-9f4d-5d2ad0e77460"),
+                        ResellerCode: "TGS",
+                        LicenseeId: Guid.Empty,
+                        LicenseeCode: string.Empty,
+                        BrandId: Guid.Empty,
+                        BrandCode: string.Empty,
+                        Contacts: new EmailContact[]
+                        {
+                            new() {
+                                Name="tst",
+                                Email="tst@rayprosoft.com",
+                                Remark="tst"
+                            }
+                        }));
+
+                _ = services.AddTransient(_ => fakeService);
+            });
+        });
+
+        var fakeLoggingHandler = new LoggingHandler(web.Services.GetRequiredService<ILogger<LoggingHandler>>());
+
+        var httpClient = web.CreateDefaultClient(fakeLoggingHandler);
+
+        var client = new NotificationContactsClient(httpClient);
+
+        var actual = await client.EmailResellerGetAsync(code: code);
+
+        Assert.NotNull(actual);
+        Assert.Equal(Guid.Parse("b5a2c708-ab70-4316-9f4d-5d2ad0e77460"), actual.ResellerId);
+        Assert.Equal("TGS", actual.ResellerCode);
+        Assert.Equal(Guid.Empty, actual.LicenseeId);
+        Assert.Equal(string.Empty, actual.BrandCode);
+        Assert.Equal(Guid.Empty, actual.BrandId);
+        Assert.Equal(string.Empty, actual.BrandCode);
+        Assert.True(actual.Contacts.Any());
+    }
+
+    [Fact]
+    public async Task Email_Reseller_Get_No_Data()
+    {
+        var code = "TGS";
+
+        var web = new TestNotificationContactsApplication(builder =>
+        {
+            _ = builder.ConfigureServices(services =>
+            {
+                var fakeService = Substitute.For<IGetService<EmailResellerGetQuery, EmailGetResult?>>();
+
+                var query = new EmailResellerGetQuery(code);
+
+                _ = fakeService.GetAsync(
+                    query: Arg.Is(query),
+                    cancellationToken: Arg.Any<CancellationToken>())
+                .Returns((EmailGetResult?)null);
+
+                _ = services.AddTransient(_ => fakeService);
+            });
+        });
+
+        var fakeLoggingHandler = new LoggingHandler(web.Services.GetRequiredService<ILogger<LoggingHandler>>());
+
+        var httpClient = web.CreateDefaultClient(fakeLoggingHandler);
+
+        var client = new NotificationContactsClient(httpClient);
+
+        var actual = await client.EmailResellerGetAsync(code: code);
+
+        Assert.Null(actual);
+    }
+
+    [Fact]
+    public async Task Email_Reseller_Merge()
+    {
+        var code = "TGS";
+        var contacts = new EmailContact[]
+        {
+            new() {
+                Name="tst",
+                Email="tst@rayprosoft.com",
+                Remark="tst"
+            }
+        };
+
+        var web = new TestNotificationContactsApplication(builder =>
+        {
+            _ = builder.ConfigureServices(async services =>
+            {
+                var fakeService = Substitute.For<ICommandService<EmailResellerMergeCommand>>();
+
+                var command = new EmailResellerMergeCommand(
+                    Code: code,
+                    Contacts: contacts);
+
+                await fakeService
+                .ExecuteAsync(
+                    command: Arg.Is(command),
+                    cancellationToken: Arg.Any<CancellationToken>());
+
+                _ = services.AddTransient(_ => fakeService);
+            });
+        });
+
+        var fakeLoggingHandler = new LoggingHandler(web.Services.GetRequiredService<ILogger<LoggingHandler>>());
+
+        var httpClient = web.CreateDefaultClient(fakeLoggingHandler);
+
+        var client = new NotificationContactsClient(httpClient);
+
+        await client.EmailResellerMergeAsync(
+            code: code,
+            contacts: contacts);
+    }
+}
