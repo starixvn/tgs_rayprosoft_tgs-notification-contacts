@@ -2,7 +2,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -66,20 +65,7 @@ builder.Services
         .AddSource("Tgs.*")
         .AddSource("TGS.*")
         .AddSource("Valhalla.*")
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddGrpcClientInstrumentation()
-        .AddGrpcCoreInstrumentation()
-        .AddEntityFrameworkCoreInstrumentation(options => options.SetDbStatementForText = true)
-        .AddOtlpExporter())
-    .WithMetrics(meterBuiler => meterBuiler
-    .SetResourceBuilder(ResourceBuilder.CreateDefault()
-    .AddEnvironmentVariableDetector())
-    .AddRuntimeInstrumentation()
-    .AddAspNetCoreInstrumentation()
-    .AddOtlpExporter())
-    .Services
-    .Configure<AspNetCoreInstrumentationOptions>(options => options.Filter =
+        .AddAspNetCoreInstrumentation(options => options.Filter =
         httpContext => !httpContext.Request.Path.HasValue
             || !httpContext.Request.Path.StartsWithSegments("/swagger")
             && !httpContext.Request.Path.StartsWithSegments("/healthz")
@@ -87,6 +73,18 @@ builder.Services
             && !httpContext.Request.Path.StartsWithSegments("/hangfire")
             && !httpContext.Request.Path.StartsWithSegments("/metrics")
             && !filterInstrumentations.Any(ext => httpContext.Request.Path.Value.EndsWith($".{ext}")))
+        .AddHttpClientInstrumentation()
+        .AddGrpcClientInstrumentation()
+        .AddGrpcCoreInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation(options => options.SetDbStatementForText = true)
+        .AddOtlpExporter())
+    .WithMetrics(meterBuiler => meterBuiler
+    .SetResourceBuilder(ResourceBuilder.CreateDefault()
+        .AddEnvironmentVariableDetector())
+        .AddRuntimeInstrumentation()
+        .AddAspNetCoreInstrumentation()
+        .AddOtlpExporter())
+    .Services
     .AddInterceptionService()
     .AddServiceUtiltiyInterceptors();
 
